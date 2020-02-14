@@ -89,15 +89,26 @@ export class AppComponent {
       this.buffer[reading.electrode].push(this.smooth(reading.samples, reading.electrode != 3));
       
       let new_mean: number = this.smooth(this.buffer[reading.electrode], false);
-      this.part_rgb[reading.electrode] = ((new_mean % 255) > 180) ? new_mean % 256: (new_mean % 255) + 75;
-
-      if(this.buffer[reading.electrode].length >= 50) {
+      if(reading.electrode != 3)
+        this.part_rgb[reading.electrode] = ((new_mean % 255) > 180) ? new_mean % 256: (new_mean % 255) + 75;
+      else
+        this.part_rgb[reading.electrode] = new_mean
+      
+      if((reading.electrode != 3 && 
+          this.buffer[reading.electrode].length >= 25) || 
+          this.buffer[reading.electrode].length >= 100) {
         this.buffer[reading.electrode].pop();
       }
 
+      let noise_str: number = 0;
+      this.buffer.forEach(buf => noise_str += (buf.length > 0) ? this.smooth(buf, true) : 0);
+      noise_str /= this.buffer.length;
+      console.log(noise_str);
+
       for(let i = 0; i < this.particles.length; i++) {
         this.particles[i].part_rgb = [this.part_rgb[0], this.part_rgb[1], this.part_rgb[2]];
-        this.particles[i].speed = this.part_rgb[3] > 0 ? (this.part_rgb[3] % 1.5) + 1 : (this.part_rgb[3] % 1.5) - 1;
+        this.particles[i].speed = (this.part_rgb[3] > 0) ? this.part_rgb[3] % 1.5 + 1 : this.part_rgb[3] % 1.5 - 1;
+        this.particles[i].noiseScale = noise_str % 99 + 1;
       }
 
       console.log(this.part_rgb[3]);
