@@ -22,7 +22,7 @@ export class AppComponent {
   particles: Particle[] = [];
   rand = Math.floor(Math.random() * 255);
   part_rgb: number[] = [255, 40, 250, 0];
-  buffer: number[][] = [[],[],[],[]];
+  buffer: number[][] = [[],[],[],[],[]];
 
   constructor() { }
 
@@ -75,9 +75,10 @@ export class AppComponent {
     let mean = arr.reduce((a,b) => a + b)/arr.length;
     let s = Math.sqrt(arr.map(x => Math.pow(x-mean,2)).reduce((a,b) => a+b)/arr.length);
     
-    let new_readings: number[] = arr.filter(x => x >= (mean - 2*s) && x <= (mean + 2*s));
+    let f = is_rgb ? 100 : 2;
+    let new_readings: number[] = (arr.length >= 20) ? arr.filter(x => x >= (mean - f*s) && x <= (mean + f*s)) : arr;
     let new_mean = new_readings.reduce((a,b) => a+b)/arr.length;
-    return is_rgb ? Math.abs(new_mean) : new_mean;
+    return [new_readings, is_rgb ? Math.abs(new_mean) : new_mean];
   }
 
 
@@ -86,32 +87,41 @@ export class AppComponent {
     await this.muse.start();
 
     this.muse.eegReadings.subscribe(reading => {
-      this.buffer[reading.electrode].push(this.smooth(reading.samples, reading.electrode != 3));
+      this.buffer[reading.electrode].push(this.smooth(reading.samples, reading.electrode != 3)[1] as number);
       
-      let new_mean: number = this.smooth(this.buffer[reading.electrode], false);
+      let ret_list = this.smooth(this.buffer[reading.electrode], false);
+      this.buffer[reading.electrode] = ret_list[0] as number[];
+      let new_mean: number = ret_list[1] as number;
       if(reading.electrode != 3)
-        this.part_rgb[reading.electrode] = ((new_mean % 255) > 180) ? new_mean % 256: (new_mean % 255) + 75;
+        this.part_rgb[reading.electrode] = ((new_mean % 255) > 180) ? new_mean % 255: (new_mean % 255) + 75;
       else
         this.part_rgb[reading.electrode] = new_mean
       
       if((reading.electrode != 3 && 
-          this.buffer[reading.electrode].length >= 25) || 
-          this.buffer[reading.electrode].length >= 100) {
+          this.buffer[reading.electrode].length > 3) || 
+          this.buffer[reading.electrode].length > 10) {
         this.buffer[reading.electrode].pop();
       }
 
       let noise_str: number = 0;
-      this.buffer.forEach(buf => noise_str += (buf.length > 0) ? this.smooth(buf, true) : 0);
-      noise_str /= this.buffer.length;
-      console.log(noise_str);
+      for(let i = 0; i < 4; i++) {
+        if(this.buffer[i].length > 0) noise_str += this.buffer[i].reduce((a,b) => a + b)/this.buffer[i].length;
+      }
+      noise_str /= 4;
+      this.buffer[4].push(noise_str);
+      let res_str = this.smooth(this.buffer[4], true);
+      this.buffer[4] = res_str[0] as number[];
+      let new_noise_str: number = res_str[1] as number;
+
+      if(this.buffer[4].length > 5) { this.buffer[4].pop(); }
 
       for(let i = 0; i < this.particles.length; i++) {
         this.particles[i].part_rgb = [this.part_rgb[0], this.part_rgb[1], this.part_rgb[2]];
-        this.particles[i].speed = (this.part_rgb[3] > 0) ? this.part_rgb[3] % 1.5 + 1 : this.part_rgb[3] % 1.5 - 1;
-        this.particles[i].noiseScale = noise_str % 99 + 1;
+        this.particles[i].speed = (this.part_rgb[3] > 0) ? this.part_rgb[3] % 1 + 1 : this.part_rgb[3] % 1 - 1;
+        this.particles[i].noiseScale = new_noise_str % 49 + 1;
       }
 
-      console.log(this.part_rgb[3]);
+      console.log(this.buffer);
 
       this.p5.draw();
     });
