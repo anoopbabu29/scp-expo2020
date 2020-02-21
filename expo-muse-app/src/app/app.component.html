@@ -1,0 +1,17 @@
+<link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
+<div style="text-align:center">
+
+  <h1>SCP Expo 2020 | Battery: {{battery}}%</h1>
+  <div style="color: white;">Battery Level: {{battery}}%</div>
+  <br>
+
+  <button (click)="onConnectButtonClick()" *ngIf="!connected">Connect</button>
+  <button (click)="disconnect()" *ngIf="connected">Disconnect</button>
+  <button (click)="onRecord()" *ngIf="!recording">Record</button>
+  <button (click)="onStopRecord()" *ngIf="recording">Stop Recording</button>
+  <br><br><br>
+  <!-- <div class="eyes">
+    <span [class.blink]="leftBlinks|async">👁</span>
+    <span [class.blink]="rightBlinks|async">👁</span>
+  </div> -->
+</div> 
