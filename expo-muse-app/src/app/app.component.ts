@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { MuseClient, channelNames } from 'muse-js';
 import { Observable, timer, of } from 'rxjs';
 import * as p5 from 'p5';
-import { filter } from 'rxjs/operators';
+declare var MediaRecorder: any;
 
 @Component({
   selector: 'app-root',
@@ -13,6 +13,8 @@ export class AppComponent {
   title = 'SCP Expo 2020!';
   private muse = new MuseClient();
   connected = false;
+  recording: boolean = false;
+  battery: number = 0;
   leftBlinks: Observable<number>;
   rightBlinks: Observable<number>;
   p5: any;
@@ -23,6 +25,10 @@ export class AppComponent {
   rand = Math.floor(Math.random() * 255);
   part_rgb: number[] = [255, 40, 250, 0];
   buffer: number[][] = [[],[],[],[],[]];
+  recordedChunks = [];
+  mediaRecorder: any;
+  stream: any;
+  int:any;
 
   constructor() { }
 
@@ -33,12 +39,49 @@ export class AppComponent {
 
   private createCanvas() {
     this.p5 = new p5(this.sketch.bind(this));
-    console.log(this.p5);
+  }
+
+  onRecord() {
+    this.recording = true;
+    let canvas: any = document.querySelector('#defaultCanvas0');
+    this.stream = canvas.captureStream(25); // 25 FPS
+    var options = { mimeType: "video/webm" };
+    this.mediaRecorder = new MediaRecorder(this.stream, options);
+    this.mediaRecorder.ondataavailable = this.handleDataAvailable.bind(this);
+    this.mediaRecorder.onstop = this.handleStop.bind(this);
+    this.mediaRecorder.start(1000);
+  }
+
+  handleStop(event) {
+    this.recording = false;
+    var blob = new Blob(this.recordedChunks, {
+      type: "video/webm"
+    });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    document.body.appendChild(a);
+    a.setAttribute('style', "display: none");
+    a.href = url;
+    a.download = "test.webm";
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    this.recordedChunks = []
+  }
+
+  handleDataAvailable(event) {
+    this.recordedChunks.push(event.data);
+  }
+
+  onStopRecord() {
+    console.log(this.recordedChunks);
+    this.mediaRecorder.stop();
+    
+    
   }
 
   sketch(p: any) {
 
-    console.log(p);
     p.setup = () => {
       p.createCanvas(this.width, this.height);
       p.noStroke();
@@ -86,6 +129,10 @@ export class AppComponent {
     await this.muse.connect();
     await this.muse.start();
 
+    this.muse.telemetryData.subscribe(telemetry => {
+      this.battery = telemetry.batteryLevel;
+    });
+
     this.muse.eegReadings.subscribe(reading => {
       this.buffer[reading.electrode].push(this.smooth(reading.samples, reading.electrode != 3)[1] as number);
       
@@ -121,8 +168,6 @@ export class AppComponent {
         this.particles[i].noiseScale = new_noise_str % 49 + 1;
       }
 
-      console.log(this.buffer);
-
       this.p5.draw();
     });
     // this.muse.telemetryData.subscribe(telemetry => {
@@ -141,7 +186,6 @@ export class AppComponent {
     )
     //this.leftBlinks = this.muse.eegReadings
     //  .filter(r => r.electrode === leftEyeChannel)
-    console.log(leftEyeChannel);
   }
   disconnect() {
     this.muse.disconnect();
